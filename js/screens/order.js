@@ -1,4 +1,4 @@
-/* M6 services · M8 single transfer screen · M9 date & time · M10 place search */
+/* M6 services · M8 single transfer screen · M10 place search */
 (function () {
   const ET = window.ET, D = ET.data, ui = ET.ui, I = ET.icon, esc = ET.esc;
   const app = ET.app;
@@ -65,7 +65,7 @@
 
   S.m8 = {
     title: 'M8',
-    init: function (P, S0) { return { price: null, errs: {}, spun: false, sig: sig(S0.draft) }; },
+    init: function (P, S0) { return { price: null, spun: false, sig: sig(S0.draft) }; },
     render: function (c) {
       const d = c.S.draft, L = c.L;
       const same = d.from && d.to && d.from === d.to;
@@ -78,12 +78,13 @@
         '<button class="swap' + (L.spun ? ' spun' : '') + '" data-act="swap" aria-label="' + c.t('a11y.swap') + '">' + I('swap') + '</button></div>' +
         (same ? '<div style="margin-top:10px">' + ui.warn(c.t('m8.same'), 'alert') + '</div>' : '');
 
-      const when = '<div class="list pick' + (L.errs.when ? ' err-card' : '') + '">' + ui.row({
-        act: 'go', arg: 'm9', icon: 'calendar', tone: d.date ? '' : 'neutral',
-        title: d.date ? '<span>' + ui.when(c, d.date, d.time) + '</span>' : '<span class="ph">' + c.t('m8.whenPh') + '</span>',
+      const e = D.earliest();
+      const when = '<div class="list pick pickup">' + ui.row({
+        static: true, icon: 'calendar',
+        title: '<input type="datetime-local" data-pickup value="' + d.date + 'T' + d.time + '" min="' + e.date + 'T' + D.fromMin(e.min) + '" max="' + D.lastDate() + 'T23:45" step="900" required aria-label="' + c.t('m8.when') + '">',
         sub: c.t('m8.when'),
-        end: (d.time ? ET.dayNight(d.time) : '') + '<span class="chev">' + I('chev') + '</span>'
-      }) + '</div>' + (L.errs.when ? '<span class="tf-help" style="color:#B4282D;margin-top:8px">' + I('alertCircle') + '<span>' + c.t('m8.errWhen') + '</span></span>' : '');
+        end: ET.dayNight(d.time)
+      }) + '</div>';
 
       // only what defines the price: route, pickup date & time, tariff (the price sits on the button)
       const body = route + when +
@@ -106,16 +107,18 @@
       tiles: function (c) {
         const d = c.S.draft, L = c.L, ok = routeReady(d);
         let html = '<div class="tiles" data-sk="tiles">' + D.classes.map(function (cl) {
-          const na = ok ? D.unavailable(d, cl.id) : null;
           const on = d.cls === cl.id;
+          const capacity = esc(c.t('m8.capacity', { p: cl.passengers, b: cl.luggage }));
           let bottom;
           if (!ok) bottom = '<span class="t-ph">—</span>'; // same pickup and destination
           else if (L.price === 'loading' || L.price == null) bottom = '<span class="t-price">' + ui.sk('74px', 26, 8) + '</span>';
           else if (L.price === 'error') bottom = '<span class="t-ph">—</span>';
-          else if (na) bottom = '<span class="t-na">' + c.t('na.' + na.code, { n: na.n }) + '</span>';
           else bottom = '<span class="t-price">' + ui.money(c, D.price(d, cl.id)) + '</span>';
-          return '<button class="tile' + (on ? ' on' : '') + (na ? ' na' : '') + '" data-act="cls" data-arg="' + cl.id + '"' + (na ? ' aria-disabled="true"' : '') + ' aria-pressed="' + on + '">' +
-            '<span class="t-top"><span class="t-ic">' + I(cl.icon) + '</span></span>' +
+          return '<button class="tile' + (on ? ' on' : '') + '" data-act="cls" data-arg="' + cl.id + '" aria-pressed="' + on + '">' +
+            '<span class="t-top"><span class="t-ic">' + I(cl.icon) + '</span>' +
+            '<span class="t-capacity" role="img" aria-label="' + capacity + '" title="' + capacity + '">' +
+            '<span aria-hidden="true">' + I('person') + cl.passengers + '</span>' +
+            '<span aria-hidden="true">' + I('luggage') + cl.luggage + '</span></span></span>' +
             '<span class="t-name">' + c.t('cls.' + cl.id) + '</span>' + bottom + '</button>';
         }).join('') + '</div>';
         if (ok && L.price === 'error') {
@@ -125,15 +128,13 @@
       },
       foot: function (c) {
         const d = c.S.draft, L = c.L, ok = routeReady(d);
-        const na = ok ? D.unavailable(d, d.cls) : null;
         const price = ok ? D.price(d, d.cls) : null;
-        const can = ok && L.price === 'ready' && !na && c.S.net !== 'offline';
+        const can = ok && L.price === 'ready' && c.S.net !== 'offline';
         // a hint only explains why the button is disabled
         let hint = null, warn = false;
         if (!ok) hint = [I('alert'), c.t('m8.hintSame')], warn = true;
         else if (L.price === 'loading' || L.price == null) hint = [ui.spinner(), c.t('m8.calc')];
         else if (L.price === 'error') hint = [I('alertCircle'), c.t('m8.hintErr')], warn = true;
-        else if (na) hint = [I('alert'), c.t('m8.hintNa', { cls: c.t('cls.' + d.cls) })], warn = true;
         return (hint ? '<div class="foot-hint' + (warn ? ' warn' : '') + '">' + hint[0] + '<span>' + hint[1] + '</span></div>' : '') +
           ui.btn(c.t('m8.order') + (can && price ? ' · ' + ui.price(c, price) : ''), { act: 'order', disabled: !can });
       }
@@ -149,13 +150,23 @@
         c.update();
       }, ms || 650);
     },
+    after: function (c, el) {
+      const input = el.querySelector('[data-pickup]');
+      input.addEventListener('change', function () {
+        const d = c.S.draft;
+        if (!input.checkValidity()) { input.value = d.date + 'T' + d.time; return; }
+        const parts = input.value.split('T');
+        d.date = parts[0]; d.time = parts[1];
+        S.m8.reprice(c);
+      });
+    },
     onEnter: function (c) {
       const L = c.L, d = c.S.draft;
       if (L.price == null && routeReady(d) && !L.frozen) S.m8.reprice(c);
     },
     onResume: function (c) {
-      if (sig(c.S.draft) !== c.L.sig) { c.L.errs = {}; S.m8.reprice(c); }
-      else { if (c.S.draft.date) c.L.errs.when = false; c.update(); }
+      if (sig(c.S.draft) !== c.L.sig) S.m8.reprice(c);
+      else c.update();
     },
     actions: {
       pick: function (c, field) { app.push('m10', { field: field }); },
@@ -166,89 +177,7 @@
       },
       cls: function (c, id) { c.S.draft.cls = id; c.update(); },
       reprice: function (c) { S.m8.reprice(c); },
-      order: function (c) {
-        const d = c.S.draft, L = c.L;
-        L.errs = { when: !d.date || !d.time };
-        if (L.errs.when) {
-          c.update();
-          const el = c.entry.el.querySelector('.err-card');
-          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          app.toast(c.t('m8.fixFields'), 'alertCircle');
-          return;
-        }
-        app.push('m14', {});
-      }
-    }
-  };
-
-  /* ================= M9 · Date & time ================= */
-  const PERIODS = [['night', 0, 360], ['morning', 360, 720], ['day', 720, 1080], ['evening', 1080, 1440]];
-  function periodOf(min) { for (let i = 0; i < PERIODS.length; i++) if (min >= PERIODS[i][1] && min < PERIODS[i][2]) return PERIODS[i][0]; return 'morning'; }
-
-  S.m9 = {
-    title: 'M9',
-    init: function (P, S0) {
-      const d = S0.draft, e = D.earliest();
-      const base = d.date || e.date;
-      const per = d.time ? periodOf(D.toMin(d.time)) : (base === e.date ? periodOf(e.min) : 'morning');
-      return { date: d.date, time: d.time, y: +base.slice(0, 4), m: +base.slice(5, 7) - 1, period: per };
-    },
-    render: function (c) {
-      const L = c.L;
-      return ui.page({
-        appbar: ui.appbar(c, { title: c.t('m9.title'), end: L.time ? ET.dayNight(L.time, 'bar') : '' }),
-        body: ui.secLabel(c.t('m9.date'), c.t('m9.tz')) + ET.region(c, 'cal') +
-          ui.secLabel(c.t('m9.time')) + ET.region(c, 'slots'),
-        foot: ui.btn(c.t('common.save'), { act: 'save', disabled: !(L.date && L.time) })
-      });
-    },
-    regions: {
-      cal: function (c) {
-        const L = c.L, sun = c.lang !== 'ru';
-        const first = new Date(Date.UTC(L.y, L.m, 1));
-        const dim = new Date(Date.UTC(L.y, L.m + 1, 0)).getUTCDate();
-        let lead = first.getUTCDay(); if (!sun) lead = (lead + 6) % 7;
-        const now = D.NOW.date, last = D.lastDate();
-        const minYM = now.slice(0, 7), maxYM = last.slice(0, 7), ym = L.y + '-' + String(L.m + 1).padStart(2, '0');
-        let g = ui.weekdays(c, sun).map(function (w) { return '<span class="wd">' + w + '</span>'; }).join('');
-        for (let i = 0; i < lead; i++) g += '<span class="d"></span>';
-        for (let day = 1; day <= dim; day++) {
-          const iso = ym + '-' + String(day).padStart(2, '0');
-          const ok = D.dateOk(iso);
-          g += '<span class="d' + (iso === now ? ' today' : '') + (iso === L.date ? ' sel' : '') + '"><button data-act="day" data-arg="' + iso + '"' + (ok ? '' : ' disabled') + ' aria-label="' + ui.fmtDate(c, iso, true) + '">' + day + '</button></span>';
-        }
-        return '<div class="cal"><div class="cal-h"><span class="mt">' + ui.fmtMonth(c, L.y, L.m) + '</span><span class="nav">' +
-          '<button class="iconbtn" data-act="mon" data-arg="-1"' + (ym <= minYM ? ' disabled' : '') + ' aria-label="' + c.t('a11y.prev') + '">' + I('back') + '</button>' +
-          '<button class="iconbtn" data-act="mon" data-arg="1"' + (ym >= maxYM ? ' disabled' : '') + ' aria-label="' + c.t('a11y.next') + '">' + I('chev') + '</button>' +
-          '</span></div><div class="cal-g">' + g + '</div></div>';
-      },
-      slots: function (c) {
-        const L = c.L;
-        const per = PERIODS.find(function (p) { return p[0] === L.period; });
-        const segs = '<div class="periods" role="tablist">' + PERIODS.map(function (p) {
-          return '<button class="seg' + (p[0] === L.period ? ' on' : '') + '" role="tab" data-act="period" data-arg="' + p[0] + '">' + c.t('m9.p.' + p[0]) + '</button>';
-        }).join('') + '</div>';
-        let s = '';
-        for (let m = per[1]; m < per[2]; m += 15) {
-          const tm = D.fromMin(m);
-          const ok = !L.date || D.slotOk(L.date, m);
-          s += '<button class="slot' + (tm === L.time ? ' on' : '') + '" data-act="slot" data-arg="' + tm + '"' + (ok ? '' : ' disabled') + '>' + tm + '</button>';
-        }
-        return segs + '<div class="slots">' + s + '</div>';
-      }
-    },
-    actions: {
-      mon: function (c, n) { let m = c.L.m + +n, y = c.L.y; if (m < 0) { m = 11; y--; } if (m > 11) { m = 0; y++; } c.L.m = m; c.L.y = y; c.patch('cal'); },
-      day: function (c, iso) {
-        const L = c.L; L.date = iso;
-        if (L.time && !D.slotOk(iso, D.toMin(L.time))) L.time = null;
-        const e = D.earliest();
-        if (iso === e.date && !L.time) L.period = periodOf(e.min);
-        c.update();
-      },
-      period: function (c, p) { c.L.period = p; c.patch('slots'); },
-      slot: function (c, t) { c.L.time = t; c.update(); },
-      save: function (c) { c.S.draft.date = c.L.date; c.S.draft.time = c.L.time; app.pop(); }
+      order: function () { ET.openPayment(); }
     }
   };
 

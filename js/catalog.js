@@ -6,7 +6,7 @@
   const C = (ET.catalog = []);
   ET.groups = [
     ['auth', 'Вход и регистрация', 'M1–M5'],
-    ['order', 'Услуги и оформление', 'M6, M8–M10'],
+    ['order', 'Услуги и оформление', 'M6, M8, M10'],
     ['pay', 'Оплата', 'M14–M16'],
     ['orders', 'Заказы', 'M17–M18'],
     ['profile', 'Профиль', 'M19, M23'],
@@ -38,7 +38,6 @@
   add('auth', 'm4', 'M4 · Код из email, таймер', function () { return m4({ code: '4829', left: 47 }); });
   add('auth', 'm4-wrong', 'M4 · Неверный код', function () { return m4({ err: 'wrong', attempts: 1, left: 31 }); });
   add('auth', 'm4-expired', 'M4 · Код истёк', function () { return m4({ code: '381920', err: 'expired', left: 0 }); });
-  add('auth', 'm4-used', 'M4 · Код уже использован', function () { return m4({ code: '222222', err: 'used', left: 12 }); });
   add('auth', 'm4-locked', 'M4 · Превышен лимит попыток', function () { return m4({ err: 'locked', attempts: 3, left: 0 }); });
   add('auth', 'm4-resend', 'M4 · Можно отправить повторно', function () { return m4({ left: 0 }); });
   add('auth', 'm5', 'M5 · Регистрация', function () { return { stack: [['m2'], ['m5']] }; });
@@ -50,7 +49,7 @@
     return { stack: [['m2'], ['m5', {}, { name: by(S.lang, { ru: 'Анна Коган', en: 'Anna Kogan', he: 'אנה כוגן' }), email: 'anna.kogan@gmail.com', agree: true, fail: 'send' }]] };
   });
 
-  /* ---------- M6, M8–M10 ---------- */
+  /* ---------- M6, M8, M10 ---------- */
   add('order', 'm6', 'M6 · Услуги', function () { return { stack: [['m6', { state: 'ready' }]] }; });
   add('order', 'm6-loading', 'M6 · Загрузка справочника', function () { return { stack: [['m6', { state: 'loading' }, { frozen: true }]] }; });
   add('order', 'm6-error', 'M6 · Ошибка загрузки справочника', function () { return { stack: [['m6', { state: 'error' }]] }; });
@@ -59,19 +58,6 @@
   add('order', 'm8-loading', 'M8 · Пересчёт цены', function (S) { sample(S); return { stack: [['m6'], ['m8', {}, { price: 'loading', frozen: true }]] }; });
   add('order', 'm8-error', 'M8 · Ошибка расчёта цены', function (S) { sample(S); return { stack: [['m6'], ['m8', {}, { price: 'error' }]] }; });
   add('order', 'm8-same', 'M8 · Точки совпадают', function (S) { sample(S); S.draft.to = 'telaviv'; return { stack: [['m6'], ['m8']] }; });
-  add('order', 'm8-na', 'M8 · Ночь: недоступные тарифы', function (S) {
-    sample(S); Object.assign(S.draft, { from: 'tlv', to: 'eilat', time: '00:30', cls: 'eco' });
-    return { stack: [['m6'], M8] };
-  });
-  add('order', 'm8-invalid', 'M8 · Не выбраны дата и время', function (S) {
-    sample(S); Object.assign(S.draft, { date: null, time: null });
-    return { stack: [['m6'], ['m8', {}, { price: 'ready', errs: { when: true } }]] };
-  });
-  add('order', 'm9', 'M9 · Дата и время', function (S) { sample(S); return { stack: [['m6'], M8, ['m9']] }; });
-  add('order', 'm9-today', 'M9 · Сегодня: ограничение подачи', function (S) {
-    sample(S); S.draft.date = D.NOW.date; S.draft.time = null;
-    return { stack: [['m6'], M8, ['m9']] };
-  });
   const m10 = function (S, L, field) { sample(S); return { stack: [['m6'], M8, ['m10', { field: field || 'from' }, L]] }; };
   add('order', 'm10', 'M10 · Поиск города — недавние', function (S) { return m10(S, {}); });
   add('order', 'm10-results', 'M10 · Поиск города — результаты', function (S) { return m10(S, { q: by(S.lang, { ru: 'тель', en: 'tel', he: 'תל' }) }, 'to'); });
@@ -80,26 +66,26 @@
   add('order', 'm10-error', 'M10 · Нет подключения', function (S) { return m10(S, { q: by(S.lang, { ru: 'хайф', en: 'haif', he: 'חיפ' }), state: 'error' }); });
 
   /* ---------- M14–M16 ---------- */
-  add('pay', 'm14-creating', 'M14 · Создание заказа', function (S) { sample(S); return { stack: [['m6'], M8, ['m14', {}, { phase: 'creating', frozen: true }]] }; });
-  add('pay', 'm14', 'M14 · Переход к оплате 3DS', function (S) { const o = withOrder(S); return { stack: [['m6'], M8, ['m14', {}, { phase: 'ready', orderId: o.id }]] }; });
-  add('pay', 'm14-error', 'M14 · Ссылка на оплату не получена', function (S) { const o = withOrder(S); return { stack: [['m6'], M8, ['m14', {}, { phase: 'error', orderId: o.id }]] }; });
+  add('pay', 'm14-creating', 'M14 · Шторка: создание заказа', function (S) {
+    sample(S); return { stack: [['m6'], M8], sheet: { name: 'payment', data: { phase: 'creating', frozen: true } } };
+  });
+  add('pay', 'm14', 'M14 · Шторка: переход к оплате 3DS', function (S) {
+    const o = withOrder(S); return { stack: [['m6'], M8], sheet: { name: 'payment', data: { phase: 'ready', orderId: o.id } } };
+  });
+  add('pay', 'm14-error', 'M14 · Шторка: ссылка на оплату не получена', function (S) {
+    const o = withOrder(S); return { stack: [['m6'], M8], sheet: { name: 'payment', data: { phase: 'error', orderId: o.id } } };
+  });
   add('pay', 'm14-3ds', 'M14 · Внешний браузер (3DS)', function (S) {
     const o = withOrder(S);
-    return { stack: [['m6'], M8, ['m14', {}, { phase: 'ready', orderId: o.id }]], sheet: { name: 'browser', data: { kind: '3ds', orderId: o.id, outcome: 'success' } } };
+    return { stack: [['m6'], M8], sheet: { name: 'browser', data: { kind: '3ds', orderId: o.id, outcome: 'success' } } };
   });
   add('pay', 'm15', 'M15 · Проверка статуса оплаты', function (S) { const o = withOrder(S); return { stack: [['m6'], M8, ['m15', { orderId: o.id, outcome: 'success' }, { frozen: true }]] }; });
-  add('pay', 'm15-slow', 'M15 · Проверка дольше обычного', function (S) { const o = withOrder(S); return { stack: [['m6'], M8, ['m15', { orderId: o.id, outcome: 'unknown' }, { slow: true, frozen: true }]] }; });
-  add('pay', 'm15-failed', 'M15 · Платёж отклонён', function (S) { const o = withOrder(S, { pay: 'failed' }); return { stack: [['m6'], M8, ['m15', { orderId: o.id }, { phase: 'failed' }]] }; });
+  add('pay', 'm15-failed', 'M15 · Платёж отклонён', function (S) { const o = withOrder(S, { pay: 'unpaid' }); return { stack: [['m6'], M8, ['m15', { orderId: o.id }, { phase: 'failed' }]] }; });
   add('pay', 'm15-cancelled', 'M15 · 3DS отменён пользователем', function (S) { const o = withOrder(S, { pay: 'unpaid' }); return { stack: [['m6'], M8, ['m15', { orderId: o.id }, { phase: 'cancelled' }]] }; });
-  add('pay', 'm16', 'M16 · Заказ оформлен', function (S) {
+  add('pay', 'm16', 'M16 · Оплата прошла', function (S) {
     const o = withOrder(S, { pay: 'succeeded', status: 'awaiting_confirmation', paidAt: '19.10 · 14:22' });
     return { stack: [['m6'], ['m16', { orderId: o.id }]] };
   });
-  add('pay', 'm16-recovery', 'M16 · Оплачено, заказ не создан', function (S) {
-    const o = withOrder(S, { pay: 'succeeded', paidAt: '19.10 · 14:22' });
-    return { stack: [['m6'], ['m16', { orderId: o.id, recovery: true }]] };
-  });
-
   /* ---------- M17–M18 ---------- */
   add('orders', 'm17', 'M17 · Активные заказы', function (S) { user(S); return { stack: [['m17']] }; });
   add('orders', 'm17-done', 'M17 · Завершённые', function (S) { user(S); return { stack: [['m17', { seg: 'done' }]] }; });

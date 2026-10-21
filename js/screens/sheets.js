@@ -73,7 +73,7 @@
           '<input value="482913" inputmode="numeric" dir="ltr" aria-label="' + c.t('br.sms') + '"></span></label>' +
           '<div class="x-actions">' + ui.btn(c.t('br.confirm'), { act: 'confirm' }) + ui.btn(c.t('br.cancel'), { kind: 'link', act: 'cancel' }) + '</div>' +
           '<div class="x-test"><span class="x-tl">' + c.t('br.test') + '</span><div class="segment">' +
-          ['success', 'failed', 'unknown'].map(function (r) { return '<button class="seg' + (c.D.outcome === r ? ' on' : '') + '" data-act="outcome" data-arg="' + r + '">' + c.t('br.r.' + r) + '</button>'; }).join('') +
+          ['success', 'failed'].map(function (r) { return '<button class="seg' + (c.D.outcome === r ? ' on' : '') + '" data-act="outcome" data-arg="' + r + '">' + c.t('br.r.' + r) + '</button>'; }).join('') +
           '</div></div>';
       } else {
         page = '<div class="x-head"><span class="lava">' + I('file') + '</span><div><div class="x-t">' + title + '</div><div class="x-s">' + c.t('br.docRev') + '</div></div></div>' +

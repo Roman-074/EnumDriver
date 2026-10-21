@@ -54,12 +54,12 @@
 
   D.placeName = function (id, lang) { const p = D.places[id]; return p ? p.name[lang] || p.name.en : ''; };
 
-  /* ---------- car classes ---------- */
+  /* ---------- car classes (demo passenger / luggage capacities) ---------- */
   D.classes = [
-    { id: 'eco', icon: 'car', k: 1 },
-    { id: 'business', icon: 'carLux', k: 1.45 },
-    { id: 'minivan', icon: 'van', k: 1.75 },
-    { id: 'minibus', icon: 'bus', k: 2.6 }
+    { id: 'eco', icon: 'car', k: 1, passengers: 4, luggage: 3 },
+    { id: 'business', icon: 'carLux', k: 1.45, passengers: 3, luggage: 3 },
+    { id: 'minivan', icon: 'van', k: 1.75, passengers: 7, luggage: 7 },
+    { id: 'minibus', icon: 'bus', k: 2.6, passengers: 16, luggage: 16 }
   ];
   D.cls = function (id) { return D.classes.find(function (c) { return c.id === id; }); };
 
@@ -89,14 +89,6 @@
     if (D.isNight(time)) p *= D.NIGHT_K;
     return r10(p);
   };
-  const SOUTH_FAR = { eilat: 1, etm: 1, eilatport: 1 };
-  /* availability of a class for the current draft → null (ok) or {code, n} */
-  D.unavailable = function (draft, clsId) {
-    const c = D.cls(clsId);
-    if (clsId === 'minibus' && (SOUTH_FAR[draft.from] || SOUTH_FAR[draft.to])) return { code: 'route' };
-    if (clsId === 'business' && draft.time && D.toMin(draft.time) < 5 * 60) return { code: 'time' };
-    return null;
-  };
 
   /* ---------- date/time helpers (all values are Israel wall-clock) ---------- */
   D.toMin = function (t) { const a = t.split(':'); return +a[0] * 60 + +a[1]; };
@@ -110,16 +102,6 @@
     return r >= 1440 ? { date: D.addDays(D.NOW.date, 1), min: r - 1440 } : { date: D.NOW.date, min: r };
   };
   D.lastDate = function () { return D.addDays(D.NOW.date, D.HORIZON_DAYS); };
-  D.slotOk = function (date, min) {
-    const e = D.earliest();
-    if (date < e.date) return false;
-    if (date === e.date && min < e.min) return false;
-    return date <= D.lastDate();
-  };
-  D.dateOk = function (date) {
-    if (date < D.earliest().date || date > D.lastDate()) return false;
-    return true;
-  };
 
   /* ---------- currencies (as in the taxi meter: Dollar, Euro, Shekel) ----------
      Fixed prices are in ILS; other currencies are converted with these mock rates. */
@@ -134,7 +116,8 @@
   let draftSeq = 1;
   D.defaultRoute = { from: 'telaviv', to: 'tlv' }; // M8 always opens with a route
   D.newDraft = function () {
-    return { id: 'd' + draftSeq++, from: D.defaultRoute.from, to: D.defaultRoute.to, date: null, time: null, cls: 'eco', orderId: null };
+    const e = D.earliest();
+    return { id: 'd' + draftSeq++, from: D.defaultRoute.from, to: D.defaultRoute.to, date: e.date, time: D.fromMin(e.min), cls: 'eco', orderId: null };
   };
   D.sampleDraft = function (lang) {
     return Object.assign(D.newDraft(), { date: '2026-10-23', time: '09:30' });
@@ -168,7 +151,7 @@
     return [
       o('ET-10446', 'netanya', 'tlv', '2026-10-21', '05:40', 'eco', 230, 'awaiting_confirmation', 'succeeded', { paidAt: '19.10 · 11:05', createdAt: '2026-10-19 11:04' }),
       o('ET-10431', 'jerusalem', 'tlv', '2026-10-20', '18:00', 'business', 360, 'driver_assigned', 'succeeded', { driver: 'mizrahi', paidAt: '17.10 · 20:41', createdAt: '2026-10-17 20:38' }),
-      o('ET-10428', 'haifa', 'tlv', '2026-10-26', '04:30', 'minivan', 640, 'awaiting_payment', 'failed', { createdAt: '2026-10-17 09:18' }),
+      o('ET-10428', 'haifa', 'tlv', '2026-10-26', '04:30', 'minivan', 640, 'awaiting_payment', 'unpaid', { createdAt: '2026-10-17 09:18' }),
       o('ET-10419', 'tlv', 'jerusalem', '2026-10-22', '23:10', 'eco', 330, 'confirmed', 'succeeded', { paidAt: '16.10 · 09:30' })
     ];
   };

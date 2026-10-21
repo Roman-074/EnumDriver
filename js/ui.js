@@ -153,15 +153,6 @@
   ui.fmtDayMonth = function (c, iso) {
     return new Intl.DateTimeFormat(LOCALE[c.lang], { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(D.parseDate(iso));
   };
-  ui.fmtMonth = function (c, y, m) {
-    return cap(new Intl.DateTimeFormat(LOCALE[c.lang], { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(Date.UTC(y, m, 1))));
-  };
-  ui.weekdays = function (c, sundayFirst) {
-    const f = new Intl.DateTimeFormat(LOCALE[c.lang], { weekday: c.lang === 'he' ? 'narrow' : 'short', timeZone: 'UTC' });
-    const out = [];
-    for (let i = 0; i < 7; i++) out.push(cap(f.format(new Date(Date.UTC(2026, 9, (sundayFirst ? 18 : 19) + i))).replace('.', '')));
-    return out;
-  };
   ui.when = function (c, date, time) {
     return ui.fmtDate(c, date) + ' · ' + time;
   };

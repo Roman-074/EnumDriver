@@ -4,15 +4,16 @@
   const app = ET.app;
   const S = ET.Screens;
 
-  /* order card: number, route, trip status + payment status (always), date/time, price */
+  /* order card: number, route, statuses, date/time, price, payment for unpaid orders */
   function ocard(c, o) {
     const tags = ui.statusTag(c, o) + ui.payTag(c, o);
-    return '<button class="ocard" data-act="open" data-arg="' + o.id + '">' +
+    return '<article class="ocard"><button class="oc-open" data-act="open" data-arg="' + o.id + '">' +
       '<span class="oc-top">' +
       '<span class="oc-main"><span class="oc-id ref" style="display:block">' + o.id + '</span>' +
       '<span class="oc-route" style="display:block">' + ui.routeLine(c, o.from, o.to) + '</span></span></span>' +
       '<span class="tags" style="margin-top:10px;justify-content:flex-start">' + tags + '</span>' +
-      '<span class="oc-bot"><span class="oc-when">' + I('calendar') + ui.when(c, o.date, o.time) + '</span>' + ui.money(c, o.price, 'oc-price') + '</span></button>';
+      '<span class="oc-bot"><span class="oc-when">' + I('calendar') + ui.when(c, o.date, o.time) + '</span>' + ui.money(c, o.price, 'oc-price') + '</span></button>' +
+      (o.status === 'awaiting_payment' ? '<div class="oc-actions">' + ui.btn(c.t('m18.payNow', { p: ui.price(c, o.price) }), { act: 'pay', arg: o.id, icon: 'card' }) + '</div>' : '') + '</article>';
   }
 
   /* ================= M17 · Orders ================= */
@@ -86,6 +87,7 @@
     actions: {
       seg: function (c, s) { c.L.seg = s; c.update(); const sc = c.entry.el.querySelector('.scroll'); if (sc) sc.scrollTop = 0; },
       open: function (c, id) { app.push('m18', { orderId: id }); },
+      pay: function (c, id) { ET.openPayment(id); },
       refresh: function (c) { S.m17.refresh(c); },
       more: function (c) { S.m17.loadMore(c); },
       newTransfer: function () { app.reset([['m6'], ['m8']], 'push'); }
@@ -95,7 +97,7 @@
   /* ================= M18 · Order card ================= */
   /* ================= M18 · Order card (minimal) =================
      One screen with only what the client needs: status, trip, price and payment,
-     the driver once assigned, and the one action left to do (pay an unpaid order). */
+     the driver once assigned, payment for an unpaid order, and a support call. */
   const ST_ICON = {
     awaiting_payment: ['amber', 'card'], awaiting_confirmation: ['', 'hourglass'], confirmed: ['', 'check'],
     driver_assigned: ['', 'car'], completed: ['neutral', 'flag'], cancelled: ['danger', 'ban'], rejected: ['danger', 'ban']
@@ -126,11 +128,11 @@
       if (o.driver) {
         const dr = D.drivers[o.driver];
         drv = '<div class="card"><div class="drv">' +
-          '<div class="dm"><div class="dn">' + dr.name[c.lang] + '</div><div class="dc">' + dr.car[c.lang] + '</div><span class="plate">' + dr.plate + '</span></div>' +
-          ui.iconBtn('phone', { act: 'call', label: c.t('m18.call') }) + '</div></div>';
+          '<div class="dm"><div class="dn">' + dr.name[c.lang] + '</div><div class="dc">' + dr.car[c.lang] + '</div><span class="plate">' + dr.plate + '</span></div></div></div>';
       }
 
-      const foot = o.status === 'awaiting_payment' ? ui.btn(c.t('m18.payNow', { p: ui.price(c, o.price) }), { act: 'pay', icon: 'external' }) : '';
+      const foot = (o.status === 'awaiting_payment' ? ui.btn(c.t('m18.payNow', { p: ui.price(c, o.price) }), { act: 'pay', icon: 'external' }) : '') +
+        ui.btn(c.t('m18.callSupport'), { kind: 'sec', act: 'support', icon: 'phone' });
       return ui.page({
         appbar: ui.appbar(c, { title: c.t('m18.title', { id: '<span class="ref">' + o.id + '</span>' }), end: ui.iconBtn('refresh', { act: 'refresh', label: c.t('m17.refresh'), disabled: L.refreshing, cls: L.refreshing ? 'spinning' : '' }) }),
         banner: ui.offline(c),
@@ -153,8 +155,8 @@
           } else { c.update(); app.toast(c.t('m18.upToDate'), 'check'); }
         }, 900);
       },
-      pay: function (c) { app.push('m14', { orderId: c.P.orderId }); },
-      call: function (c) { app.toast(c.t('m18.calling'), 'phone'); }
+      pay: function (c) { ET.openPayment(c.P.orderId); },
+      support: function (c) { app.toast(c.t('m18.supportDemo'), 'phone'); }
     }
   };
 })();

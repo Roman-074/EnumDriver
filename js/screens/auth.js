@@ -81,8 +81,8 @@
   };
 
   /* ================= M4 · Email confirmation code ================= */
-  const CODE_ERR = { '000000': 'wrong', '111111': 'expired', '222222': 'used' };
-  const DEAD = { expired: 1, used: 1, locked: 1 }; // a new code is needed, confirm stays disabled
+  const CODE_ERR = { '000000': 'wrong', '111111': 'expired' };
+  const DEAD = { expired: 1, locked: 1 }; // a new code is needed, confirm stays disabled
   S.m4 = {
     title: 'M4',
     init: function (P) { return { code: '', err: null, busy: false, left: P.left != null ? P.left : 59, attempts: 0 }; },
